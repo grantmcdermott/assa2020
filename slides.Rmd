@@ -1,0 +1,969 @@
+---
+title: "Hydro power. Market might.\n<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html>"
+# subtitle: "<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html>"
+author: "Grant McDermott"
+date: "University of Oregon"
+output: 
+  xaringan::moon_reader:
+    css: [default, metropolis, metropolis-fonts, "https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"]
+    nature: 
+      beforeInit: "macros.js"
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      #ratio: "16:9"
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+
+library(knitr)
+opts_chunk$set(
+  fig.width=8, fig.height=6, fig.align="center",
+  out.width="748px", #out.length="520.75px",
+  dpi=300, #fig.path='Figs/',
+  cache=T,
+  echo=F, warning=F, message=F
+  )
+
+## Bilbiography
+library(RefManageR)
+BibOptions(check.entries = FALSE, bib.style = "authoryear", style = "markdown",
+           dashed = TRUE)
+bib <- ReadBib("/home/grant/Dropbox/LaTeX/BiBTeX/myrefs.bib")
+
+## Other libraries
+library(tidyverse)
+library(lubridate)
+library(forcats)
+# library(DT)
+library(hrbrthemes)
+library(extrafont)
+library(grid)
+library(scales)
+library(RColorBrewer)
+#library(plotly)
+library(leaflet)
+library(maps)
+
+## Month order from Summer to Winter (useful for plots)
+month_ord <- 
+  c("May", "Jun", "Jul", "Aug", "Sep", "Oct",
+    "Nov", "Dec", "Jan", "Feb", "Mar", "Apr")
+
+## For plots
+font_type <- 
+  choose_font(c("Fira Sans", "Yanone Kaffeesatz"))
+
+font_size <- 15
+strip_size <- 18
+ax_size <- 15
+cap_size <- 12
+theme_set(
+  theme_ipsum(
+    base_family = font_type,
+    plot_margin = margin(10, 10, 10, 10),
+    base_size = font_size,
+    plot_title_size = font_size,
+    strip_text_size = strip_size,
+    axis_title_size = ax_size,
+    caption_size = cap_size,
+    axis_title_just = "mc"
+    ) +
+    theme(strip.text = element_text(hjust = 0.5))
+)
+```
+
+# Motivation
+
+### Why is market power bad?
+--
+count: false
+- Econ 101: Deadweight loss b/c dominant firms withhold production. 
+
+--
+count: false
+
+### But is this really true?
+--
+count: false
+- Suprisingly difficult to verify empirically. 
+- Identification is tough. Requires lots of imposed structure...
+  
+???
+- Identification is hard (especially in a dynamic setting). 
+- Firms don't merge with other firms by accident, or enter and exit markets at random. 
+- They do so b/c of expectations about future profits, demand, etc.
+
+--
+count: false
+### This paper 
+- Identify causal impact of market power on firm behaviour (in reduced-form setting).
+- Bridge the gap between theory and empirics. 
+
+---
+
+# Approach and contribution
+
+### Exogenous formation of localized electricity markets
+- Source: Transmission constraints.
+- The *definition* of the market is changing over time.
+
+### Plant-level data
+- 500 Norwegian hydropower plants.
+- Hydropower offers specific empirical advantages (more on this later).
+
+### Research questions
+  1. Do firms withold production when they gain more market power? 
+  2. Welfare effects in this market?
+  3. Are there environmental consequences?
+
+---
+count: false
+
+# Approach and contribution
+
+### Exogenous formation of localized electricity markets
+- Source: Transmission constraints.
+- The *definition* of the market is changing over time.
+
+### Plant-level data
+- 500 Norwegian hydropower plants.
+- Hydropower offers specific empirical advantages (more on this later).
+
+### Research questions
+  1. Do firms withold production when they gain more market power? (**Yes**)
+  2. Welfare effects in this market? (**Modest, but...**)
+  3. Are there environmental consequences? (**Probably**)
+
+---
+count: false
+class: inverse, center, middle
+
+# Introduction
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+(Or: Why should you care?)
+
+---
+
+# Market power is "so hot right now"
+
+### Growing concerns...
+
+- Stagnant wages and falling labour productivity shares: `r Citet(bib, c("autor2017superstar", "azar2017concentration", "benmelech2018strong"))`.
+- Slowdown in aggregate output: `r Citet(bib, c("deloecker2017rise"))`. 
+
+### ... across various dimensions
+- Nationally and globally: `r Citet(bib, c("azar2018concentration", "deloecker2018global"))`.
+- Traditional and nascent markets `r Citet(bib, c("benmelech2018strong", "dube2018monopsony"))`.
+
+--
+count: false
+
+Okay, but what does all this have to do with hydropower?
+
+---
+
+# Hydropower is important
+
+```{r primary_energy, echo=FALSE, message=FALSE, warning=FALSE}
+type <- c("Oil", "Coal", "Gas", "Hydro", "Nuclear", "Other")
+tpes <- c(32.6, 30.0, 23.7, 6.8, 4.4, 2.5) ## BP Statistical Review (2015): Year = 2014
+elec <- c(5.0, 40.4, 22.5, 16.2, 10.9, 5.0)
+
+energy <- tbl_df(data.frame(cbind(type, tpes, elec)))
+
+energy <- 
+  energy %>%
+  gather(form, perc, -type) %>%
+  mutate(perc = as.numeric(perc)) %>%
+  mutate(form_labs = ifelse(form == "tpes", "(a) Global primary energy \n", "(b) Global electricity \n")) 
+
+energy$type <- factor(energy$type, levels = type)
+energy$form_labs <- factor(energy$form_labs, levels = c("(a) Global primary energy \n", "(b) Global electricity \n"))
+
+my_grbu <- c(rep("#BDBDBD", times = 3), brewer.pal(3, "Blues")[2], rep("#BDBDBD", times = 2))
+
+energy %>% 
+  filter(!is.na(perc)) %>%
+  ggplot(aes(x = factor(type), y = perc/100, fill = factor(type)), color = factor(type)) +  
+  stat_summary(fun.y = mean, geom = "bar") +
+  geom_text(
+    data = energy %>% filter(type=="Hydro"),
+    aes(label=paste0(round(perc, 0), "%"), family = font_type), 
+    position=position_dodge(width=0.9), vjust=-0.5
+    ) +
+  scale_fill_manual(values = my_grbu, breaks = type) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = NULL, y = NULL,
+    caption = "\n Source: BP (2016)"
+    ) + 
+  facet_wrap(~ form_labs, scales = "free_x") +
+  theme(
+    legend.position = "none",
+    # text = element_text(family = font_type),
+    axis.text.x = element_text(angle = 45, vjust = 0.95, hjust = 1.01),
+    # strip.text = element_text(size = strip_size),
+    # strip.background = element_rect(fill = "white"), ## Facet strip
+    panel.spacing = unit(4, "lines") ## Increase gap between facet panels
+    )
+
+```
+
+???
+- Also integration with other renewables. 
+- "Battery" for other areas. E.g. €2bn NordLink cable btw Norway and Germany (2019). 
+---
+
+# Hydropower is empirically unique
+
+### Homogenous end-good (electricity)
+- Don't have to worry about branding, advertising, etc.
+
+### Dispatchable production
+- Don't have to worry about production inertia.
+
+### Negligible marginal costs
+- Production based on the opportunity cost of water (use today vs. save tomorrow).
+
+
+???
+- Can abstract from many of the usual concerns in empirical I/O: MC estimation, product differentiation, branding...
+- Inflows are seasonal (stochastic), but storable.
+- Dynamic optimisation problem.
+- Dominant firms increase profits by witholding production during periods with inelastic demand.
+
+---
+
+# Literature
+
+### Theory and other regions 
+
+- `r Citet(bib, c("wolfram1999duopoly", "joskow2000transmission", "borenstein2000competitive", "borenstein2002california", "wolak2003measuring", "musgens2006quantifying", "sweeting2007england", "puller2007pricing", "mansur2007oligopolists", "hortacsu2008strategic", "reguant2014startup", "davis2016nuclear", "woerman2019market"))`
+
+### Nordic focus
+
+- `r Citet(bib, c("johnsen1999zonal", "hjalmarsson2000nordpool", "steen2004bottlenecks", "kauppi2008empirical", "fridolfsson2009market", "mirza2012transmission"))`
+
+### This study
+
+- Advantageous research design, combined with plant-level data. Richer variation in market power over longer period of time. (He said modestly.)
+
+???
+- General finding of previous literature is one of healthy competition, but with some scope for exercising local market power.
+- Don't need to impose any structure on the data or models, nor do I require simulation and MC estimation.
+- I find direct evidence of strategic, intertemporal firm behaviour over longer periods of time.
+
+---
+count: false
+class: inverse, center, middle
+
+# Theory
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+---
+name: theory
+
+# Hydropower production
+
+### Competition
+- Equalise prices across periods (*a la* Hotelling).
+
+### Market power
+- Shift resources across periods (e.g. [monopolist case](#monopolist)).
+- Undersupply in more inelastic demand periods. Oversupply in more elastic ones.
+
+### Testable implication
+- Dominant firms should maintain fuller reservoirs in inelastic demand periods. 
+
+???
+- Production in a hydro system is a dynamic optimisation problem.
+  - How much to use today vs save for tomorrow?
+  - Producer's decision is driven by the opportunity cost of water.
+- Hotelling arbitrage argument: Prices equalised across periods by producing $\propto$ demand.
+- Although, discounting not really appropriate for hydropower production horizon.
+- General result is robust to various extensions (trade, uncertainty, etc.)
+- P's and Q's diverge from their social optimums.
+- Implies an observable difference in reservoir management. 
+
+---
+count: false
+class: inverse, center, middle
+
+# Institutional features
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+---
+name: sector
+
+# Norwegian electricity sector
+
+### Supply
+- Hydropower totally dominant (> 95% of total).
+
+### Demand
+- Winter double that of summer... but heating is substitutable and market fosters consumer responsiveness (variable contracts, [in-house meters](#in-house), etc.)
+
+### (Spoilers)
+- Summer demand is significantly more *inelastic* than winter demand.
+- Implies: Dominant firms to keep fuller reservoirs during summer (as they withhold production) and vice versa during winter.
+
+???
+- Similar seasonal elasticity in other high-latitude countries, e.g. Canada (<span style="color:#0c5999">Genc, 2016</span>).
+- Approx. 85–90% of end-user contracts are either spot price contracts or (highly-correlated) variable
+price contracts that may be terminated at short notice.
+
+---
+
+# Nord Pool and Elspot
+
+### The market exchange 
+- Norway is part of *Nord Pool*. 
+  - The world's first (and still largest) multi-national power exchange.
+- Foundation of Nord Pool is the day-ahead *Elspot* market.
+- Elspot market comprises distinct bidding areas.
+
+### Role of transmission constraints
+- Not binding: Common system price in all areas.
+- Binding: Areas become their own markets.
+- Creates opportunities for exploiting local market power.
+
+---
+
+# Stylised example
+
+<span style="color:#729dce"><b>Blue:</b></span> 60% market share.</br>
+<span style="color:#ff6665"><b>Red:</b></span> 40% market share.
+<div align="center">
+<img src="pics/toy.png" height=350>
+</div>
+
+---
+
+# Stylised example (cont.)
+
+<span style="color:#729dce"><b>Blue</b></span> 100% $(\uparrow)$ & 33% $(\downarrow)$ market share.</br>
+<span style="color:#ff6665"><b>Red:</b></span> 67% $(\uparrow)$ market share.
+<div align="center">
+<img src="pics/toy1a.png" height=350>
+</div>
+
+---
+name:identification
+
+# Identification
+
+### Two layers of exogenous variation
+  
+### 1. Transmission constraints 
+- The ultimate mechanism for changes in market power.
+- *Why* do firms gain/lose local market power?
+- Exogeneity: Physical nature of electricity, geography.
+- <a href="http://driftsdata.statnett.no/Web/Map/snpscustom?language=en" target="_blank">Link</a>. [Stills](#prices-flows-stills).
+
+### 2. Bidding area (re)configuration
+- Adds richness by affecting the [magnitude](#variation) of change.
+- *How much* market power do firms get?
+- Exogeneity: Maintenance, new regions, climate, geography.
+- <a href="http://www.statnett.no/en/Market-and-operations/the-power-market/" target="_blank">Link</a>. [Stills](#config-stills).
+
+Together, these layers allow me to trace out the response of individual plants at *varying* levels of market power.
+
+???
+- Following other studies (<span style="color:#0c5999">Joskow and Tirole, 2000</span>; <span style="color:#0c5999">Borenstein et al., 2000</span>; <span style="color:#0c5999">Steen, 2004</span>; <span style="color:#0c5999">Mirza and Bergland, 2012</span>), I focus on *local* market power that arises from transmission constraints between bidding areas.
+- However, my dataset allows me to go further by exploiting the exogenous changes in bidding areas that occur over time.
+    + Reservoirs are reassigned to a new bidding areas where the owner firms have more (or less) market power.
+- Control for potential problems that arise from changing demand by using zone and regime fixed effects.
+ 
+---
+count: false
+class: inverse, center, middle
+
+# Data
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+---
+name: data
+
+# Data
+
+### Hydropower reservoirs (2000-2013)
+- Daily time series data for the 500 largest reservoirs in Norway (2 million obs).
+- Approximately 90% of the total system capacity.
+- Matched to other important covariates, such as plant ID, producer info, GIS, etc.
+
+### Electricity flows and prices (2000-2013)
+- Prices and flows per bidding area over the same period.
+- Transmission constraints and boundary changes. 
+
+### Electricity bid curves (2014-2017)
+- Allows for direct measurement of demand elasticities.
+
+### Weather (2000-2013)
+- Precipitation and temperature data as controls.
+
+---
+
+# Residual Supply Index
+
+### A better measure of market power 
+
+(And new to this version of the paper)
+
+$$ RSI_f = \frac{\text{Total capacity} - \text{Firm f's capacity}}{\text{Total Demand}} $$
+
+Basically, how difficult is it to meet supply without firm f's production?
+
+--
+
+</br>
+
+Note that $\downarrow$ RSI $\Rightarrow \,\uparrow$ market power
+
+- RSI < 1 implies that a firm is "pivotal".
+
+---
+
+# Residual Supply Index (cont.)
+
+<div align="center">
+<img src="pics/rsi-hist.png" height=550>
+</div>
+
+---
+
+# Hydro reservoirs 
+
+```{r reservoirs, echo=FALSE, message=FALSE, warning=FALSE, fig.height=1.8}
+
+stations <- read_csv("../../hydro/data/stations.csv") 
+
+stations <- 
+  stations %>% 
+  group_by(elspot_02dec2013) %>% 
+  mutate(tot_vol = sum(maxvol, na.rm = T)) %>%
+  ungroup() %>%
+  group_by(elspot_02dec2013, producer) %>% 
+  mutate(mktshr = sum(maxvol, na.rm = T) / tot_vol * 100) %>% 
+  ungroup()
+
+# library(leaflet)
+# library(maps)
+mapNorway <- map("world", "norway", fill = T, plot = F, encoding="UTF-8")
+
+## Create colour palette for bidding area info
+# library(RColorBrewer)
+elspot_cols <- c(brewer.pal(6, "Accent")[c(3)],
+                 brewer.pal(3, "Paired")[c(1)],
+                 brewer.pal(6, "Accent")[c(5, 1, 6)])
+factpal <- colorFactor(elspot_cols, stations$elspot_02dec2013)
+
+leaflet(data = mapNorway) %>%
+  fitBounds(0, 60, 35, 72) %>%
+  addPolygons(stroke = FALSE, fillOpacity = 1, smoothFactor = 1, color = "white") %>%
+  # addTiles() %>%
+  addCircles(
+    data = stations, lng = ~long, lat = ~lat, weight = 1,
+    color = ~factpal(elspot_02dec2013), fillOpacity = 0.5,
+    radius = ~sqrt(maxvol) * 500,
+    popup = ~paste0(
+      # "<style> div.leaflet-popup-content {width:auto !important;}</style>", ##http://stackoverflow.com/questions/29365749/how-to-control-popups-width-for-leaflet-features-popup-in-r
+      "<b>Reservoir: </b>", reservoir, "<br>",
+      "<b>Volume: </b>", prettyNum(maxvol, big.mark=",", preserve.width="none"), " Mm<sup>3</sup>", "<br>",
+      # "<b>Area: </b>", prettyNum(area, big.mark=",", preserve.width="none"), " km<sup>2</sup>", "<br>",
+      # "<b>Regulated height: </b>", prettyNum(maxlev-minlev, big.mark = ",", preserve.width = "none"), " m", "<br>",
+      "<b>Plant: </b>", plant, "<br>",
+      "<b>Capacity: </b>", prettyNum(maxpower, big.mark=",", preserve.width="none"), " MW", "<br>",
+      "<b>Firm: </b>", producer, "<br>",
+      "<b>Area market share: </b>", round(mktshr, 1), "%", "<br>",
+      "<b>Bidding area: </b>", elspot_02dec2013, "<br>"
+      )#,
+    # popupOptions(minWidth = 500,maxWidth = 100) ## Gets overridden by revealjs settings
+    ) %>%
+  addLegend("bottomright", pal = factpal, values = stations$elspot_02dec2013,
+    title = "Elspot bidding area",
+    # labFormat = labelFormat(prefix = "NO"),
+    opacity = 0.75
+ )
+```
+
+---
+count: false
+class: inverse, center, middle
+
+# Econometrics
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html>
+
+---
+
+# Regression equation
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({ TeX: { extensions: ["color.js"] }});
+</script>
+
+$$V_{it} = \sum_{m = 1}^{12}{\beta_m M_{mt}} + \sum_{m = 1}^{12}{\gamma_m M_{mt} \cdot \left( - RSI_{it, f(it)}\right)} + \mathbf{X \beta_X} + a_i + v_{it}, \label{eq:reg1a}$$
+where, for reservoir $i$ belonging to firm $f$ on day $t$,
+- $V$ is reservoir volume (% of max regulated capacity)
+- $M_m$ is set of month dummies
+- $RSI$ is the residual market index of firm $f$
+- $\mathbf{X}$ are a set of additional controls: temperature & precipitation; plant & zone fixed effects, etc.)
+- SEs are two-way clustered at the firm and (price-)zone level
+
+???
+- Estimate water volumes in reservoir $i$ $(i,...,N)$, belonging to hydropower firm $f$ $(f = 1,...,F)$, at time $t$ $(t = 1,...,T)$. 
+    + Reservoir is primary observation unit.
+    + Firm is secondary observation unit.
+- Following <span style="color:#0c5999">Abowd et al. (2008)</span> reservoir-firm relationship conceptualised through a link function, $f = F(i, t)$, i.e. firm $f$ is managing reservoir $i$ at time $t$.
+- Regression equation thus given as...
+
+---
+count: false
+
+# Regression equation
+
+$$V_{it} = \sum_{m = 1}^{12}{\beta_m M_{mt}} + \sum_{m = 1}^{12}{{\color{red}\gamma_m} M_{mt} \cdot \left( - RSI_{it, f(it)}\right)} + \mathbf{X \beta_X} + a_i + v_{it}, \label{eq:reg1b}$$
+
+where, for reservoir $i$ belonging to firm $f$ on day $t$,
+- $V$ is reservoir volume (% of max regulated capacity)
+- $M_m$ is set of month dummies
+- $RSI$ is the residual market index of firm $f$
+- $\mathbf{X}$ are a set of additional controls: temperature & precipitation; plant & zone fixed effects, etc.)
+- SEs are two-way clustered at the firm and (price-)zone level
+
+Primarily interested in the $\color{red}\gamma_m$ parameters on the interacted market share variable.
+
+---
+count: false
+class: inverse, center, middle
+
+# Results
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+---
+
+# From to demand elasticities...
+
+```{r elasticities, echo=FALSE, message=FALSE, warning=FALSE}
+theme_results <-
+  theme(
+    axis.title.x = element_blank()
+    )
+
+## Elasticity regression results
+elast_coefs <- read_csv("../../hydro/results/elasticity-coefs.csv") 
+
+elast_coefs %>%
+  filter(grepl("mnth", term)) %>%
+  rename(mnth = term) %>%
+  mutate(mnth = month(as.integer(gsub("mnth","",mnth)), label=T)) %>%
+  mutate(mnth = fct_relevel(mnth, month_ord)) %>%
+  ggplot(aes(x=mnth, y=estimate)) +
+  geom_hline(
+    yintercept = elast_coefs %>% filter(grepl("mnth", term)) %>% pull(estimate) %>% median(), 
+    lwd = 0.75, col = "orange"
+    ) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high)) +
+  labs(y = expression(Predicted~epsilon[D])) +
+  theme_results
+```
+
+---
+
+# ...to implied reservoir volumes (stylised)
+
+```{r elasticities_Q, echo=FALSE, message=FALSE, warning=FALSE}
+q_vol <-
+  elast_coefs %>%
+  select(term, estimate) %>%
+  filter(grepl("mnth", term)) %>%
+  rename(mnth = term) %>%
+  mutate(mnth = month(as.integer(gsub("mnth","",mnth)), label=T)) %>%
+  mutate(mnth = fct_relevel(mnth, month_ord)) %>%
+  arrange(mnth) %>%
+  mutate(eD_med = median(estimate)) %>%
+  mutate(zero = 0) %>%
+  mutate(r = rank(estimate)) %>% 
+  mutate(extremes = ceiling(abs(median(r)-r))) %>%
+  group_by(extremes) %>%
+  mutate(q_pair = mean(abs(eD_med-estimate))) %>% 
+  ungroup %>%
+  mutate(q = ifelse(r<=6, q_pair, -q_pair)) %>%
+  mutate(Q = cumsum(-q)) %>%
+  mutate(grp = ifelse(q>0, "Oversupply", "Withhold"))
+## Volume (Q)
+q_vol %>%
+  ggplot(aes(as.numeric(mnth))) +
+  geom_hline(yintercept = median(q_vol$Q), col = "orange") +
+  geom_line(aes(y=Q)) +
+  geom_pointrange(aes(y=Q, ymin=Q, ymax=Q)) +
+  # geom_vline(xintercept = 6.5, lty = 4) +
+  scale_color_brewer(palette = "Set1", guide = F) +
+  scale_x_continuous(
+    breaks = 1:12,
+    labels = month_ord
+    ) +
+  lims(y = c(-max(abs(q_vol$Q)), max(abs(q_vol$Q)))) +
+  labs(y = "Q (= Volume)") + 
+  theme_results +
+  theme(
+    axis.title.x = element_blank(), 
+    # axis.title.y = element_text(angle=0),
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_blank(),
+    panel.grid.minor.x = element_blank()
+    )
+```
+
+---
+
+# Effect of market power 
+
+```{r model_1}
+rsi_coefs <- 
+  read_csv("../../hydro/rsi/results/coefs-rsi.csv") %>%
+  mutate(model = paste0(model, " \n"))
+
+mod_theme <-
+  theme(
+    axis.title.x = element_blank(),
+    text = element_text(size = 18),
+    axis.text = element_text(size = 16),
+    axis.text.x = element_text(angle = 45, vjust = 0.95, hjust = 1.01),
+    strip.text = element_text(size = 18),
+    panel.spacing = unit(2, "lines") 
+    )
+
+rsi_plot_func <-
+  function(d) {
+    d %>%
+    filter(grepl("rsi", term)) %>%
+    mutate(seas = ifelse(grepl("seas", term), "Seasonal", "Base")) %>%
+    # mutate(term = gsub("\\:.*","",term)) %>%
+    mutate(mnth = month(as.integer(gsub("mnth", "", gsub("\\:.*","",term))), label = T)) %>%
+    mutate(mnth = fct_relevel(mnth, month_ord)) %>%
+    ggplot(aes(x = mnth, y = estimate / 100)) +
+    geom_hline(yintercept = 0, col = "orange") +
+    geom_pointrange(aes(ymax = conf.high / 100, ymin = conf.low/ 100)) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(x = "Month", y = "Reservoir volume") + 
+    facet_wrap(~ model) +
+    mod_theme
+  }
+
+rsi_plot_func(filter(rsi_coefs, model == "Model 1 \n")) +
+  labs(caption = "Constraint-weighted RSI\nNot seasonally adjusted")
+```
+
+---
+
+# Effect of market power (cont.) 
+
+```{r model_2, echo=FALSE, message=FALSE, warning=FALSE}
+rsi_plot_func(filter(rsi_coefs, model == "Model 2 \n")) +
+  labs(caption = "Constraint-weighted RSI\nSeasonally adjusted")
+```
+
+---
+
+# Effect of market power (cont.) 
+
+```{r model_3, echo=FALSE, message=FALSE, warning=FALSE}
+rsi_plot_func(filter(rsi_coefs, model == "Model 3 \n")) +
+  labs(caption = "Price-based RSI\nNot seasonally adjusted")
+```
+
+---
+
+# Effect of market power (cont.) 
+
+```{r model_4, echo=FALSE, message=FALSE, warning=FALSE}
+rsi_plot_func(filter(rsi_coefs, model == "Model 4 \n")) +
+  labs(caption = "Price-based RSI\nSeasonally adjusted")
+```
+
+---
+class: inverse, center, middle
+
+### What about a discrete measure of market power? 
+
+$D_{RSI<1} = \text{Pivotal}$
+
+---
+
+# Effect of becoming a pivotal firm 
+
+```{r model_6}
+piv_coefs <- 
+  read_csv("../../hydro/rsi/results/coefs-piv.csv") %>%
+  mutate(model = paste0(model, " \n"))
+
+rsi_plot_func(filter(piv_coefs, model == "Model 6 \n")) +
+  labs(caption = "Price-based DRSI<1\nNot seasonally adjusted")
+```
+
+---
+
+# Welfare
+
+```{r welfare}
+welfare <- read_csv("../../hydro/results/welfare/welfare.csv")
+
+# library(cowplot)
+welfare %>%
+  select(regime, mnth, eqm_price, new_price) %>%
+  # gather(key, price, eqm_price:new_price) %>%
+  mutate(regime = as.numeric(as.factor(regime))) %>%
+  ggplot(aes(x=regime)) +
+  geom_point(aes(y=eqm_price), col="grey", size = 3, show.legend = F) +
+  geom_point(aes(y=new_price), col="red", size = 3, stroke=0.5, shape=21) +
+  # geom_line() + 
+  geom_segment(
+    aes(y=eqm_price, yend=new_price, xend=regime),
+    arrow = arrow(length = unit(.15, "lines"))
+  ) +
+  # geom_hline(
+  #   data = welfare %>% distinct(mnth, eqm_price),
+  #   aes(yintercept = eqm_price),
+  #   col="grey"
+  #   ) +
+  scale_x_continuous(
+    breaks = 1:17,
+    labels = LETTERS[1:17]
+    ) +
+  scale_y_continuous(limits = c(0, max(welfare$eqm_price))) +
+  labs(x = "Regime", y = "Price (EUR/MWh)") +
+  facet_wrap(~month(mnth, label = T, abbr = F)) +
+  # theme_ipsum(
+  #   base_family = font_type,
+  #   base_size = 12,
+  #   caption_size = 12,
+  #   axis_title_size = 14
+  # ) +
+  theme(
+    panel.grid.minor.x = element_blank(),
+    strip.text = element_text(hjust = 0.5),
+    axis.title.x = element_text(hjust = 0.5),
+    axis.title.y = element_text(hjust = 0.5)#,
+    # legend.title = element_blank(),
+    # legend.position = "bottom",
+    # panel.spacing = unit(0.5, "lines") ## Decrease gap between facet panels
+  )
+```
+
+
+---
+count: false
+class: inverse, center, middle
+
+# Conclusions
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+---
+
+# Conclusions
+
+### Approach
+
+- Exploit exogenous variation in localized electricity markets (source: transmission constraints).
+- Pair with a rich dataset of Norwegian hydropower firms and electricity flows.
+
+### Results
+- Empirical results closely match the predictions of theory.
+- 1% $\uparrow$ in local market share leads to $\pm$ 0.3% $\uparrow$ in reservoir volumes.
+   - Opposite effect in winter.
+- Numerous reasons to view these results as a lower bound.
+
+### Policy relevance
+- Even "competitive" markets are susceptible to manipulation and welfare losses.
+- Hydro producers may not fully accommodate intermittent renewables like wind. Though, could also ameliorate impacts of market power. (Follow-up study.)
+
+???
+- Focus on hydropower brings its own unique empirical advantages.
+- Caveats
+    + Assume that firm ownership stays constant over time
+    + Don't consider effects of partial- and cross-ownership.
+    + Still need to calculate price effects (waiting on data).
+    
+---
+count: false
+class: inverse, center
+background-image: url(pics/rallarvegen-crop.jpg)
+background-size: 100% 50%
+
+# Thank you!
+</br></br></br></br></br></br></br></br></br></br></br></br></br></br>
+.right[
+<i class="fa fa-globe"></i> <a href="http://www.grantmcdermott.com" target="_blank">www.grantmcdermott.com</a></br>
+<i class="fa fa-envelope-square"></i> <a href="mailto:grantmcd@uoregon.edu" target="_blank">grantmcd@uoregon.edu</a></br>
+<i class="fa fa-twitter-square"></i> <a href="https://twitter.com/grant_mcdermott" target="_blank">@grant_mcdermott</a></br>
+]
+
+---
+count: false
+class: inverse, center, middle
+
+# Appendices
+
+<html><div style='float:left'></div><hr color='#EB811B' size=1px width=720px></html> 
+
+---
+count: false
+name: monopolist
+
+# Monopolist's problem
+
+Consider the simplest theoretical case: Hydropower monopoly in two-period model (summer and winter).
+- No uncertainty, reservoir limits or trade
+
+Monopolist maximizes revenue subject to her water endowment.
+
+$$\max \sum^2_{t=1} p_t \left( q_t \right) \cdot q_t$$
+s.t. 
+$$\sum^2_{t=1}{q_t} \leq, W$$
+
+- $p_t \left( q_t \right)$ is an inverse demand function,
+- $q_t$ is the (water-equivalent) electricity demand,
+- $W$ is the known water endowment for the monopolist's reservoir.
+
+---
+count: false
+
+# Monopoly (cont.)
+
+$$\begin{aligned} \frac{\partial L}{\partial q_t} = {p_{t}} ' \left( q_t \right) \cdot q_t + p_t \left( q_t \right) - \lambda &\leq 0 \\ (	& = 0 \text{ for } q_t > 0 ) \end{aligned}$$
+
+and
+
+$$\begin{aligned} \lambda & \geq 0 \\ (	& = 0 \text{ for } \sum^2_{t=1} q_t < W ) \end{aligned}$$
+Rearranging gives:
+
+$$
+p_1 \left( q_1 \right) \left( 1 + \frac{1}{\epsilon_1} \right) = p_2 \left( q_2 \right) \left( 1 + \frac{1}{\epsilon_2} \right) = \lambda,
+$$
+
+where $\epsilon_t = \frac{p_t}{q_t}\frac{\partial q_t}{\partial p_t} < 0$ is the price elasticity of demand. 
+
+
+---
+count: false
+
+# Monopoly (cont.)
+
+Summary: Prices and quantities depend on the relative demand elasticities in each period. E.g:
+
+$$
+	p_1 \left( q_1 \right) > p_2 \left( q_2\right) \text{ }\text{ }\text{ if }\text{ }\text{ } \left| \epsilon_1 \left( q_1 \right) \right| < \left| \epsilon_2 \left( q_2 \right) \right| .
+$$
+and
+$$
+	q_1 < q_2 \text{ }\text{ }\text{ if }\text{ }\text{ } \left| \epsilon_1 \left( q_1 \right) \right| < \left| \epsilon_2 \left( q_2 \right) \right| .
+$$
+
+.right[[Go back](#theory).]
+
+---
+count: false
+name: in-house
+
+# In-house metering
+
+<div class="video_container">
+  <video width="700" height="400" controls="controls" allowfullscreen="true">
+    <source src="pics/bard1.mp4" type="video/mp4">
+  </video> 
+</div>
+
+.right[[Go back](#sector).]
+
+---
+count: false
+name: prices-flows-stills
+
+# Area prices and bottlenecks
+
+![](pics/prices-flows.png)
+
+---
+count: false
+
+# Area prices and bottlenecks
+
+![](pics/prices-flows-zoom.png)
+.right[[Go back](#identification).]
+
+---
+count: false
+name: config-stills
+
+# Changing area (market) definitions
+
+![](pics/config1.png)
+
+---
+count: false
+
+# Changing area (market) definitions
+
+![](pics/config2.png)
+
+---
+count: false
+
+# Changing area (market) definitions
+
+![](pics/config3.png)
+
+---
+count: false
+
+# Changing area (market) definitions
+
+![](pics/config4.png)
+.right[[Go back](#identification).]
+
+---
+name: variation
+count: false
+
+# Variation from regime changes
+
+```{r mktshr_disb, echo=FALSE, message=FALSE, warning=FALSE}
+## What is the distribution of changes to market share (i.e. by individal 
+## stations/reservoirs)?
+mktshr_change <- read_csv("../../hydro/data/marketshares-change.csv")
+mktshr_change %>%
+  filter(change_mktshr < -.5 | change_mktshr > .5) %>%
+  filter(change_mktshr != 0) %>%
+  group_by(change_mktshr) %>%
+  summarise(n_stations = sum(n_stations)) %>%
+  ggplot(aes(change_mktshr/100, weight = n_stations)) +
+  geom_histogram(
+    binwidth = .01#,
+    # col = "#377EB8", fill = "#377EB8", lwd = 0.1, alpha = 0.6
+    ) +
+  # geom_vline(xintercept = 0, col = "red", lwd = 3.5) +
+  geom_vline(xintercept = 0, col = "black", lty = 2) +
+  scale_x_continuous(breaks = seq(-.3,.4, by = .1), labels = scales::percent) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    x = "Change in market share", y = "No. of occurences", 
+    caption = "Excludes observations with approximately zero change."
+    ) +
+  theme(text = element_text(family = font_type),
+        plot.caption=element_text(margin = margin(t = 15),
+                                  face = "italic")
+        )
+
+```
+.right[[Go back](#identification2).]
+
