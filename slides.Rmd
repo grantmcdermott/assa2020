@@ -133,7 +133,7 @@ count: false
 
 ### Research questions
   1. Do firms withold production when they gain more market power? (**Yes**)
-  2. Welfare effects in this market? (**Modest, but...**)
+  2. Welfare effects in this market? (**Yes**)
   3. Are there environmental consequences? (**Probably**)
 
 ---
@@ -779,8 +779,7 @@ class: inverse, center, middle
 
 ### Results
 - Empirical results closely match the predictions of theory.
-- 1% $\uparrow$ in local market share leads to $\pm$ 0.3% $\uparrow$ in reservoir volumes.
-   - Opposite effect in winter.
+- Gaining "pivotal" status in local markets causes firms to withhold supply (equivalent to 2&ndash;5% of reservoir volumes).
 - Numerous reasons to view these results as a lower bound.
 
 ### Policy relevance
